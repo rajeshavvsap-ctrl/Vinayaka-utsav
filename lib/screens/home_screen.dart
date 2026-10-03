@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -51,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (m['status'] == 'pending') {
           p += toNum(m['amount']);
           pc++;
+          if (m['createdBy'] != widget.session.me.id) _enqueue('payment', d);
         }
       }
       if (mounted) {
@@ -104,7 +106,10 @@ class _HomeScreenState extends State<HomeScreen> {
       for (final d in s.docs) {
         final st = d.data()['status'];
         if (st == 'approved') approved++;
-        if (st == 'pending') pending++;
+        if (st == 'pending') {
+          pending++;
+          _enqueue('member', d);
+        }
       }
       if (mounted) {
         setState(() {
@@ -122,6 +127,134 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     super.dispose();
   }
+
+  // ---------- approval pop-ups (admins only) ----------
+  // While the app is open, every new member request and every new payment
+  // waiting for verification pops up, one at a time, with action buttons.
+  final _prompted = <String>{};
+  final _queue = <DocumentReference<Map<String, dynamic>>>[];
+  bool _showing = false;
+
+  void _enqueue(String kind, QueryDocumentSnapshot<Map<String, dynamic>> d) {
+    if (!widget.session.isAdmin) return;
+    if (!_prompted.add('$kind/${d.id}')) return;
+    _queue.add(d.reference);
+    _showNext();
+  }
+
+  Future<void> _showNext() async {
+    if (_showing || _queue.isEmpty || !mounted) return;
+    _showing = true;
+    final ref = _queue.removeAt(0);
+    try {
+      final fresh = await ref.get();
+      if (mounted && fresh.data()?['status'] == 'pending') {
+        if (ref.parent.id == 'users') {
+          await _memberDialog(fresh);
+        } else {
+          await _paymentDialog(fresh);
+        }
+      }
+    } catch (_) {
+      // Ignore; the item is still visible in its screen.
+    }
+    _showing = false;
+    if (mounted) _showNext();
+  }
+
+  Future<void> _memberDialog(DocumentSnapshot<Map<String, dynamic>> d) async {
+    final m = d.data()!;
+    final action = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => AlertDialog(
+        icon: const Icon(Icons.person_add_alt_1_outlined, color: AppColors.blue, size: 36),
+        title: const Text('New member request'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${m['name']}', style: display(20)),
+            const SizedBox(height: 6),
+            Text('Mobile: ${m['phone']}'),
+            Text('Email: ${m['email']}'),
+            const SizedBox(height: 10),
+            const Text('Approve only committee members.', style: TextStyle(color: AppColors.muted, fontSize: 13)),
+          ],
+        ),
+        actions: _actions(c, 'Approve'),
+      ),
+    );
+    if (action == 'ok' || action == 'reject') {
+      try {
+        await d.reference.update({'status': action == 'ok' ? 'approved' : 'rejected'});
+        if (mounted) toast(context, '${m['name']} ${action == 'ok' ? 'approved' : 'rejected'}');
+      } catch (e) {
+        if (mounted) toast(context, 'Could not update: $e');
+      }
+    }
+  }
+
+  Future<void> _paymentDialog(DocumentSnapshot<Map<String, dynamic>> d) async {
+    final c = d.data()!;
+    final proofId = '${c['proofId'] ?? ''}';
+    final action = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.volunteer_activism_outlined, color: AppColors.purple, size: 36),
+        title: const Text('Payment to verify'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${c['name']}', style: display(20)),
+                Text(rupees(toNum(c['amount'])), style: display(26, color: AppColors.maroon)),
+                Text('${c['mode']} · ${prettyDay('${c['date']}')}'),
+                if ('${c['txnRef'] ?? ''}'.isNotEmpty) Text('Ref: ${c['txnRef']}'),
+                const SizedBox(height: 10),
+                if (proofId.isNotEmpty)
+                  ProofImage(proofId: proofId, height: 240)
+                else
+                  const Text('No screenshot attached.', style: TextStyle(color: AppColors.muted)),
+              ],
+            ),
+          ),
+        ),
+        actions: _actions(ctx, 'Verify'),
+      ),
+    );
+    if (action == 'ok' || action == 'reject') {
+      try {
+        await d.reference.update({
+          'status': action == 'ok' ? 'verified' : 'rejected',
+          'verifiedBy': widget.session.me.id,
+          'verifiedByName': widget.session.me.name,
+          'verifiedAt': FieldValue.serverTimestamp(),
+        });
+        if (mounted) toast(context, 'Payment ${action == 'ok' ? 'verified' : 'rejected'}');
+      } catch (e) {
+        if (mounted) toast(context, 'Could not update: $e');
+      }
+    }
+  }
+
+  List<Widget> _actions(BuildContext c, String okLabel) => [
+        TextButton(onPressed: () => Navigator.pop(c, 'later'), child: const Text('Later')),
+        TextButton(
+          onPressed: () => Navigator.pop(c, 'reject'),
+          style: TextButton.styleFrom(foregroundColor: AppColors.red),
+          child: const Text('Reject'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(c, 'ok'),
+          style: FilledButton.styleFrom(backgroundColor: AppColors.green, minimumSize: const Size(96, 44)),
+          child: Text(okLabel),
+        ),
+      ];
 
   void _open(Widget screen) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
 
