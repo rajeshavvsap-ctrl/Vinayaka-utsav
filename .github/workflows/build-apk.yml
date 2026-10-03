@@ -121,7 +121,7 @@ jobs:
             if keytool -list -keystore "$UPLOAD_KEYSTORE_PATH" -storepass "$UPLOAD_STORE_PASSWORD" > /dev/null 2>&1; then
               echo "::error title=aab::Password is correct but the key-alias secret is wrong (it must be the word: upload)."
             else
-              echo "::error title=aab::Key check failed. password length ${#UPLOAD_STORE_PASSWORD} (expected 20); key file $(stat -c %s "$UPLOAD_KEYSTORE_PATH") bytes, fingerprint $(sha256sum "$UPLOAD_KEYSTORE_PATH" | cut -c1-12)."
+              echo "::error title=aab::Key check failed. password length ${#UPLOAD_STORE_PASSWORD} (expected 20), check $(printf "%s" "$UPLOAD_STORE_PASSWORD" | sha256sum | cut -c1-6); key file $(stat -c %s "$UPLOAD_KEYSTORE_PATH") bytes, fingerprint $(sha256sum "$UPLOAD_KEYSTORE_PATH" | cut -c1-12)."
             fi
             exit 1
           fi
