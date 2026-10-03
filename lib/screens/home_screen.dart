@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models.dart';
+import '../services/account.dart';
 import '../services/db.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -340,11 +341,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           if (v == 'out' &&
                               await confirmDialog(context, 'Sign out?', 'You can sign in again any time.')) {
                             await FirebaseAuth.instance.signOut();
+                          } else if (v == 'delete') {
+                            await deleteMyAccount(context);
                           }
                         },
                         itemBuilder: (_) => [
                           PopupMenuItem(enabled: false, child: Text('${s.me.name}${s.isAdmin ? ' (Admin)' : ''}')),
                           const PopupMenuItem(value: 'out', child: Text('Sign out')),
+                          const PopupMenuItem(value: 'delete', child: Text('Delete my account')),
                         ],
                       ),
                     ],

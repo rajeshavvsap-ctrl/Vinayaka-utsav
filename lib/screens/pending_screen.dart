@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../services/account.dart';
 import '../services/db.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -49,6 +50,11 @@ class PendingScreen extends StatelessWidget {
                   onPressed: () => FirebaseAuth.instance.signOut(),
                   icon: const Icon(Icons.logout),
                   label: const Text('Sign out'),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => deleteMyAccount(context),
+                  child: const Text('Delete my account'),
                 ),
               ],
             ),

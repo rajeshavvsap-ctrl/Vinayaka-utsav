@@ -1,7 +1,9 @@
 name: Build APK
 
-# Builds the Android app in the cloud on every push, so the app can be
-# made and updated without a laptop. The APK appears under Releases.
+# Builds the app in the cloud on every push, so it can be made and updated
+# without a laptop.
+#  - vinayaka-utsav.apk : shared by link; the app's update pop-up points here
+#  - vinayaka-utsav.aab : for Google Play (built when the UPLOAD_* secrets exist)
 on:
   push:
     branches: [main]
@@ -13,6 +15,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      BUILD_NO: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v5
 
@@ -36,17 +40,16 @@ jobs:
       - name: Create Android project files
         run: flutter create . --org com.vinayakautsav --project-name vinayaka_utsav --platforms android
 
-      - name: Android settings (min SDK, app name)
-        run: |
-          f=android/app/build.gradle.kts; [ -f "$f" ] || f=android/app/build.gradle
-          sed -i -E 's/minSdk(Version)?( *=)? *flutter\.minSdkVersion/minSdk = 23/' "$f"
-          grep -n "minSdk\|applicationId" "$f"
-          sed -i 's/android:label="vinayaka_utsav"/android:label="Vinayaka Utsav"/' android/app/src/main/AndroidManifest.xml
+      - name: Android settings (min SDK, app name, signing)
+        run: python3 ci/patch_android.py
 
-      - name: Use fixed signing key (so updates install over the old app)
+      - name: Use fixed signing key for the shared APK (so updates install over the old app)
         run: mkdir -p ~/.android && cp ci/debug.keystore ~/.android/debug.keystore
 
       - run: flutter pub get
+
+      - name: App icon
+        run: dart run flutter_launcher_icons
 
       # Each step below also reports its errors as a build annotation, so
       # they are readable from the run summary.
@@ -75,26 +78,64 @@ jobs:
       - name: Build APK
         run: |
           status=0
-          flutter build apk --release > out.txt 2>&1 || status=$?
+          flutter build apk --release --build-number=$BUILD_NO --build-name=1.0.$BUILD_NO \
+            --dart-define=CHANNEL=github > out.txt 2>&1 || status=$?
           cat out.txt
           if [ $status -ne 0 ]; then
             msg=$(grep -E -A4 "error:|Error:|What went wrong|FAILURE" out.txt | head -50 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
             echo "::error title=build::$msg"
           fi
           exit $status
-
+          
       - name: Rename APK
         run: cp build/app/outputs/flutter-apk/app-release.apk vinayaka-utsav.apk
 
+      - name: Build Play Store bundle (AAB)
+        env:
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
+          UPLOAD_STORE_PASSWORD: ${{ secrets.UPLOAD_STORE_PASSWORD }}
+          UPLOAD_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
+          UPLOAD_KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
+        run: |
+          if [ -z "$UPLOAD_KEYSTORE_BASE64" ]; then
+            echo "::notice title=aab::Play Store bundle skipped - add the UPLOAD_* secrets to build it."
+            exit 0
+          fi
+          echo "$UPLOAD_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          export UPLOAD_KEYSTORE_PATH="$RUNNER_TEMP/upload.jks"
+          status=0
+          flutter build appbundle --release --build-number=$BUILD_NO --build-name=1.0.$BUILD_NO \
+            --dart-define=CHANNEL=play > out.txt 2>&1 || status=$?
+          cat out.txt
+          if [ $status -ne 0 ]; then
+            msg=$(grep -E -A4 "error:|Error:|What went wrong|FAILURE" out.txt | head -50 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=aab::$msg"
+            exit $status
+          fi
+          cp build/app/outputs/bundle/release/app-release.aab vinayaka-utsav.aab
+
       - uses: actions/upload-artifact@v4
         with:
-          name: vinayaka-utsav-apk
-          path: vinayaka-utsav.apk
+          name: vinayaka-utsav-build-${{ github.run_number }}
+          path: |
+            vinayaka-utsav.apk
+            vinayaka-utsav.aab
+          if-no-files-found: ignore
+
+      - name: Release notes
+        env:
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          first=$(printf '%s\n' "${MSG:-Manual build}" | head -n1)
+          printf "What's new: %s\n\nDownload vinayaka-utsav.apk below and install it on Android.\n" "$first" > notes.md
 
       - name: Publish as a Release (download from phone)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: Vinayaka Utsav app - build ${{ github.run_number }}
-          body: Download vinayaka-utsav.apk below and install it on Android.
-          files: vinayaka-utsav.apk
+          body_path: notes.md
+          files: |
+            vinayaka-utsav.apk
+            vinayaka-utsav.aab
+          fail_on_unmatched_files: false

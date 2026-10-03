@@ -34,7 +34,8 @@ service cloud.firestore {
       allow update: if isAdmin()
         || (signedIn() && request.auth.uid == userId
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone']));
-      allow delete: if isAdmin();
+      // Admins remove members; anyone can delete their own profile.
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == userId);
     }
 
     // settings/festival: dates, pooja slots, UPI ID.
