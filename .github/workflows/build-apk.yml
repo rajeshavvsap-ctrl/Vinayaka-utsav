@@ -106,8 +106,19 @@ jobs:
             echo "::notice title=aab::Play Store bundle skipped - missing secrets:$missing"
             exit 0
           fi
-          echo "$UPLOAD_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          # Tolerate spaces / line breaks picked up while copy-pasting the secret.
+          if ! printf '%s' "$UPLOAD_KEYSTORE_BASE64" | tr -d ' \r\n\t' | base64 -d > "$RUNNER_TEMP/upload.jks" 2>/dev/null; then
+            echo "::error title=aab::The keystore-file secret is not valid - copy the whole long line again."
+            exit 1
+          fi
           export UPLOAD_KEYSTORE_PATH="$RUNNER_TEMP/upload.jks"
+          export UPLOAD_STORE_PASSWORD=$(printf '%s' "$UPLOAD_STORE_PASSWORD" | tr -d ' \r\n\t')
+          export UPLOAD_KEY_PASSWORD=$(printf '%s' "$UPLOAD_KEY_PASSWORD" | tr -d ' \r\n\t')
+          export UPLOAD_KEY_ALIAS=$(printf '%s' "$UPLOAD_KEY_ALIAS" | tr -d ' \r\n\t')
+          if ! keytool -list -keystore "$UPLOAD_KEYSTORE_PATH" -storepass "$UPLOAD_STORE_PASSWORD" -alias "$UPLOAD_KEY_ALIAS" > /dev/null 2>&1; then
+            echo "::error title=aab::Keystore check failed - the store-password or key-alias secret does not match the key file."
+            exit 1
+          fi
           status=0
           flutter build appbundle --release --build-number=$BUILD_NO --build-name=1.0.$BUILD_NO \
             --dart-define=CHANNEL=play > out.txt 2>&1 || status=$?
