@@ -320,3 +320,34 @@ String? amountValidator(String? v) {
   if (n >= 10000000) return 'Amount looks too large';
   return null;
 }
+
+/// Dropdown limited to the festival days the admin configured.
+class FestivalDayField extends StatelessWidget {
+  const FestivalDayField({
+    super.key,
+    required this.festival,
+    required this.value,
+    required this.onChanged,
+    this.label = 'Festival day',
+  });
+  final Festival festival;
+  final String value;
+  final ValueChanged<String> onChanged;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final keys = festival.dayKeys;
+    return DropdownButtonFormField<String>(
+      value: keys.contains(value) ? value : keys.first,
+      decoration: InputDecoration(labelText: label),
+      items: [
+        for (final k in keys)
+          DropdownMenuItem(value: k, child: Text('Day ${festival.dayNumber(k)} · ${prettyDay(k)}')),
+      ],
+      onChanged: (v) {
+        if (v != null) onChanged(v);
+      },
+    );
+  }
+}

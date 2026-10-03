@@ -13,6 +13,7 @@ import 'contributions_screen.dart';
 import 'expenses_screen.dart';
 import 'members_screen.dart';
 import 'pooja_screen.dart';
+import 'reports_screen.dart';
 import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -166,6 +167,9 @@ class _HomeScreenState extends State<HomeScreen> {
           AppColors.blue,
           () => _open(MembersScreen(session: s)),
           badge: s.isAdmin ? _pendingMembers : 0),
+      if (s.isAdmin)
+        _Tile('Reports', 'Day-wise & final PDF', Icons.picture_as_pdf_outlined, AppColors.greenBg,
+            AppColors.green, () => _open(ReportsScreen(session: s))),
       if (s.isAdmin)
         _Tile('Settings', 'Dates, slots, UPI', Icons.tune_outlined, AppColors.amberBg, AppColors.amber,
             () => _open(SettingsScreen(festival: f))),

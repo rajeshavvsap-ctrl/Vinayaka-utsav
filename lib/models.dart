@@ -60,7 +60,7 @@ class Festival {
     final ts = m?['startDate'];
     final s = ts is Timestamp ? ts.toDate() : now;
     final rawDays = m?['days'];
-    final days = rawDays is num ? rawDays.toInt().clamp(1, 21).toInt() : 10;
+    final days = rawDays is num ? rawDays.toInt().clamp(1, 21).toInt() : 5;
     final rawSlots = m?['poojaSlots'];
     final slots = rawSlots is List
         ? rawSlots.map((e) => '$e'.trim()).where((e) => e.isNotEmpty).toList()

@@ -306,7 +306,7 @@ class _AddContributionScreenState extends State<AddContributionScreen> {
   final _txn = TextEditingController();
   final _note = TextEditingController();
   String _mode = paymentModes.first;
-  DateTime _date = DateTime.now();
+  late String _day = widget.session.festival.initialDay();
   Uint8List? _proof;
   bool _busy = false;
 
@@ -337,7 +337,7 @@ class _AddContributionScreenState extends State<AddContributionScreen> {
         'mode': _mode,
         'txnRef': _txn.text.trim(),
         'note': _note.text.trim(),
-        'date': dayKey(_date),
+        'date': _day,
         'proofId': proofId,
         'status': 'pending',
         ...Db.stamp(),
@@ -391,7 +391,12 @@ class _AddContributionScreenState extends State<AddContributionScreen> {
               onChanged: (v) => setState(() => _mode = v ?? _mode),
             ),
             const SizedBox(height: 12),
-            DateField(label: 'Payment date', value: _date, onChanged: (d) => setState(() => _date = d)),
+            FestivalDayField(
+              label: 'Payment date',
+              festival: widget.session.festival,
+              value: _day,
+              onChanged: (d) => setState(() => _day = d),
+            ),
             const SizedBox(height: 12),
             if (_mode != 'Cash') ...[
               TextFormField(

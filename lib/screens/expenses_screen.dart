@@ -213,7 +213,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   final _note = TextEditingController();
   String _category = expenseCategories.first;
   String _mode = paymentModes.first;
-  DateTime _date = DateTime.now();
+  late String _day = widget.session.festival.initialDay();
   Uint8List? _proof;
   bool _busy = false;
 
@@ -239,7 +239,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         'mode': _mode,
         'paidBy': _paidBy.text.trim(),
         'note': _note.text.trim(),
-        'date': dayKey(_date),
+        'date': _day,
         'proofId': proofId,
         ...Db.stamp(),
       });
@@ -285,7 +285,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               onChanged: (v) => setState(() => _category = v ?? _category),
             ),
             const SizedBox(height: 12),
-            DateField(label: 'Date', value: _date, onChanged: (d) => setState(() => _date = d)),
+            FestivalDayField(
+              label: 'Date',
+              festival: widget.session.festival,
+              value: _day,
+              onChanged: (d) => setState(() => _day = d),
+            ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _paidBy,

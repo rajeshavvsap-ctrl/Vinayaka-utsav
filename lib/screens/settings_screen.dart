@@ -84,7 +84,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             TextFormField(
               controller: _days,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Number of days (1–21)'),
+              decoration: const InputDecoration(labelText: 'Number of festival days (e.g. 5)',
+                helperText: 'Members can only pick dates inside these days.'),
               validator: (v) {
                 final n = int.tryParse((v ?? '').trim());
                 return n == null || n < 1 || n > 21 ? 'Enter 1 to 21' : null;

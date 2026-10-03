@@ -2,10 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vinayaka_utsav/models.dart';
 
 void main() {
-  test('festival defaults to 10 days with two pooja slots', () {
+  test('festival defaults to 5 days with two pooja slots', () {
     final f = Festival.fromMap(null);
-    expect(f.days, 10);
-    expect(f.dates.length, 10);
+    expect(f.days, 5);
+    expect(f.dates.length, 5);
     expect(f.slots, Festival.defaultSlots);
     expect(f.configured, isFalse);
   });
