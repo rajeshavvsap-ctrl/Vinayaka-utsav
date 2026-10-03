@@ -1,0 +1,86 @@
+rules_version = '2';
+
+// Vinayaka Chaturthi committee app - security rules.
+// Only signed-in users whose profile an admin has APPROVED can read or write
+// festival data. New users can only create their own "pending" profile.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function profilePath() { return /databases/$(database)/documents/users/$(request.auth.uid); }
+    function hasProfile() { return signedIn() && exists(profilePath()); }
+    function profile() { return get(profilePath()).data; }
+    function isMember() { return hasProfile() && profile().status == 'approved'; }
+    function isAdmin() { return isMember() && profile().role == 'admin'; }
+
+    function createdByMe() { return request.resource.data.createdBy == request.auth.uid; }
+    function ownsDoc() { return resource.data.createdBy == request.auth.uid; }
+    function keepsOwner() { return request.resource.data.createdBy == resource.data.createdBy; }
+    function validAmount() {
+      return request.resource.data.amount is number
+        && request.resource.data.amount > 0
+        && request.resource.data.amount < 10000000;
+    }
+
+    // Member profiles. Doc id = Firebase Auth uid.
+    match /users/{userId} {
+      allow read: if (signedIn() && request.auth.uid == userId) || isMember();
+      allow create: if signedIn() && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['name', 'phone', 'email', 'role', 'status', 'createdAt'])
+        && request.resource.data.name is string && request.resource.data.name.size() > 0
+        && request.resource.data.role == 'member'
+        && request.resource.data.status == 'pending';
+      // Admins approve / reject / change roles. Users may edit only their name and phone.
+      allow update: if isAdmin()
+        || (signedIn() && request.auth.uid == userId
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone']));
+      allow delete: if isAdmin();
+    }
+
+    // settings/festival: dates, pooja slots, UPI ID.
+    match /settings/{docId} {
+      allow read: if isMember();
+      allow write: if isAdmin();
+    }
+
+    match /activities/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && createdByMe();
+      allow update: if (isAdmin() || (isMember() && ownsDoc())) && keepsOwner();
+      allow delete: if isAdmin() || (isMember() && ownsDoc());
+    }
+
+    match /poojaSignups/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && createdByMe()
+        && request.resource.data.name is string && request.resource.data.name.size() > 0;
+      allow delete: if isAdmin() || (isMember() && ownsDoc());
+    }
+
+    match /expenses/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && createdByMe() && validAmount();
+      allow update: if (isAdmin() || (isMember() && ownsDoc())) && keepsOwner() && validAmount();
+      allow delete: if isAdmin() || (isMember() && ownsDoc());
+    }
+
+    // Contributions start as 'pending'; only admins can verify / reject.
+    match /contributions/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && createdByMe() && validAmount()
+        && request.resource.data.status == 'pending';
+      allow update: if isAdmin() && keepsOwner();
+      allow delete: if isAdmin() || (isMember() && ownsDoc() && resource.data.status == 'pending');
+    }
+
+    // Payment screenshots / bills (compressed JPEG stored as base64).
+    match /proofs/{id} {
+      allow read: if isMember();
+      allow create: if isMember()
+        && request.resource.data.uploadedBy == request.auth.uid
+        && request.resource.data.image is string
+        && request.resource.data.image.size() < 1000000;
+      allow delete: if isAdmin() || (isMember() && resource.data.uploadedBy == request.auth.uid);
+    }
+  }
+}

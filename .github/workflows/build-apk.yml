@@ -1,0 +1,71 @@
+name: Build APK
+
+# Builds the Android app in the cloud on every push, so the app can be
+# made and updated without a laptop. The APK appears under Releases.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Check Firebase config
+        run: |
+          if [ ! -f lib/firebase_options.dart ]; then
+            echo "::error::lib/firebase_options.dart is missing - add your Firebase project config first."
+            exit 1
+          fi
+
+      - name: Create Android project files
+        run: flutter create . --org com.vinayakautsav --project-name vinayaka_utsav --platforms android
+
+      - name: Android settings (min SDK, app name)
+        run: |
+          f=android/app/build.gradle.kts; [ -f "$f" ] || f=android/app/build.gradle
+          sed -i -E 's/minSdk(Version)?( *=)? *flutter\.minSdkVersion/minSdk = 23/' "$f"
+          grep -n "minSdk\|applicationId" "$f"
+          sed -i 's/android:label="vinayaka_utsav"/android:label="Vinayaka Utsav"/' android/app/src/main/AndroidManifest.xml
+
+      - name: Use fixed signing key (so updates install over the old app)
+        run: mkdir -p ~/.android && cp ci/debug.keystore ~/.android/debug.keystore
+
+      - run: flutter pub get
+
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - run: flutter test
+
+      - run: flutter build apk --release
+
+      - name: Rename APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk vinayaka-utsav.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vinayaka-utsav-apk
+          path: vinayaka-utsav.apk
+
+      - name: Publish as a Release (download from phone)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Vinayaka Utsav app - build ${{ github.run_number }}
+          body: Download vinayaka-utsav.apk below and install it on Android.
+          files: vinayaka-utsav.apk

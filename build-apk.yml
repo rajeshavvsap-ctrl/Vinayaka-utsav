@@ -1,0 +1,50 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unzip app code
+        run: unzip -q vinayaka_utsav.zip
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Add Android project files
+        working-directory: vinayaka_utsav
+        run: |
+          flutter create --org com.vinayaka --platforms android .
+          for f in android/app/build.gradle.kts android/app/build.gradle; do
+            [ -f "$f" ] && sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/; s/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/' "$f"
+          done
+          sed -i 's/android:label="vinayaka_utsav"/android:label="Vinayaka Utsav"/' android/app/src/main/AndroidManifest.xml
+
+      - name: Get packages
+        working-directory: vinayaka_utsav
+        run: flutter pub upgrade --major-versions || flutter pub get
+
+      - name: Build APK
+        working-directory: vinayaka_utsav
+        run: >
+          flutter build apk --release
+          --dart-define=FB_API_KEY=${{ secrets.FB_API_KEY }}
+          --dart-define=FB_APP_ID=${{ secrets.FB_APP_ID }}
+          --dart-define=FB_SENDER_ID=${{ secrets.FB_SENDER_ID }}
+          --dart-define=FB_PROJECT_ID=${{ secrets.FB_PROJECT_ID }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vinayaka-utsav-apk
+          path: vinayaka_utsav/build/app/outputs/flutter-apk/app-release.apk

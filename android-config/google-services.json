@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "277745479815",
+    "firebase_url": "https://vinayaka-utsav-2340e-default-rtdb.firebaseio.com",
+    "project_id": "vinayaka-utsav-2340e",
+    "storage_bucket": "vinayaka-utsav-2340e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:277745479815:android:a43ecc47d8c997fcab0822",
+        "android_client_info": {
+          "package_name": "com.vinayakautsav.vinayaka_utsav"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyABTpTEPm3M-nH8Nl2IrFDsnLN-wWtfmB0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
