@@ -39,7 +39,7 @@ class _ContributionsScreenState extends State<ContributionsScreen> {
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: Db.contributions.snapshots(),
         builder: (context, snap) {
-          if (snap.hasError) return ErrorHint(snap.error);
+          if (snap.hasError) return LoadErrorView(snap.error);
           if (!snap.hasData) return const Center(child: CircularProgressIndicator());
           final all = snap.data!.docs.toList()
             ..sort((a, b) {

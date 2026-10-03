@@ -40,7 +40,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: Db.activities.where('date', isEqualTo: _day).snapshots(),
               builder: (context, snap) {
-                if (snap.hasError) return ErrorHint(snap.error);
+                if (snap.hasError) return LoadErrorView(snap.error);
                 if (!snap.hasData) return const Center(child: CircularProgressIndicator());
                 final docs = snap.data!.docs.toList()
                   ..sort((a, b) => '${a.data()['time']}'.compareTo('${b.data()['time']}'));

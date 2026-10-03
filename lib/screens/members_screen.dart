@@ -19,7 +19,7 @@ class MembersScreen extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: Db.users.snapshots(),
         builder: (context, snap) {
-          if (snap.hasError) return ErrorHint(snap.error);
+          if (snap.hasError) return LoadErrorView(snap.error);
           if (!snap.hasData) return const Center(child: CircularProgressIndicator());
           final all = snap.data!.docs.map(Member.fromDoc).toList()
             ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));

@@ -128,8 +128,8 @@ class EmptyHint extends StatelessWidget {
   }
 }
 
-class ErrorHint extends StatelessWidget {
-  const ErrorHint(this.error, {super.key});
+class LoadErrorView extends StatelessWidget {
+  const LoadErrorView(this.error, {super.key});
   final Object? error;
 
   @override

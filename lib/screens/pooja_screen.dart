@@ -36,7 +36,7 @@ class _PoojaScreenState extends State<PoojaScreen> {
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: Db.poojaSignups.where('date', isEqualTo: _day).snapshots(),
               builder: (context, snap) {
-                if (snap.hasError) return ErrorHint(snap.error);
+                if (snap.hasError) return LoadErrorView(snap.error);
                 if (!snap.hasData) return const Center(child: CircularProgressIndicator());
                 final docs = snap.data!.docs.toList()
                   ..sort((a, b) => '${a.data()['name']}'.toLowerCase().compareTo('${b.data()['name']}'.toLowerCase()));

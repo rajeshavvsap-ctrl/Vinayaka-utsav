@@ -38,7 +38,7 @@ class _ProfileGate extends StatelessWidget {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: Db.users.doc(user.uid).snapshots(),
       builder: (context, snap) {
-        if (snap.hasError) return Scaffold(body: ErrorHint(snap.error));
+        if (snap.hasError) return Scaffold(body: LoadErrorView(snap.error));
         if (!snap.hasData) return const Loading();
         if (!snap.data!.exists) return ProfileSetupScreen(user: user);
         final me = Member.fromDoc(snap.data!);
@@ -46,7 +46,7 @@ class _ProfileGate extends StatelessWidget {
         return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
           stream: Db.festival.snapshots(),
           builder: (context, fSnap) {
-            if (fSnap.hasError) return Scaffold(body: ErrorHint(fSnap.error));
+            if (fSnap.hasError) return Scaffold(body: LoadErrorView(fSnap.error));
             if (!fSnap.hasData) return const Loading();
             final festival = Festival.fromMap(fSnap.data!.data());
             return HomeScreen(session: Session(me, festival));
