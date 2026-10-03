@@ -214,6 +214,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Text('${c['name']}', style: display(20)),
                 Text(rupees(toNum(c['amount'])), style: display(26, color: AppColors.maroon)),
+                if (flatLabel(c).isNotEmpty) Text('Flat: ${flatLabel(c)}'),
                 Text('${c['mode']} · ${prettyDay('${c['date']}')}'),
                 if ('${c['txnRef'] ?? ''}'.isNotEmpty) Text('Ref: ${c['txnRef']}'),
                 const SizedBox(height: 10),

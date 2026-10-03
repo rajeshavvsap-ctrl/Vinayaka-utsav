@@ -137,3 +137,14 @@ const expenseCategories = [
 ];
 
 const paymentModes = ['UPI', 'Cash', 'Bank transfer'];
+
+/// Apartment blocks members can belong to.
+const residentBlocks = ['A', 'B', 'C'];
+
+/// "A-101" style label for a contribution (empty for old entries).
+String flatLabel(Map<String, dynamic> c) {
+  final b = '${c['block'] ?? ''}';
+  final f = '${c['flat'] ?? ''}';
+  if (b.isEmpty && f.isEmpty) return '';
+  return '$b-$f';
+}

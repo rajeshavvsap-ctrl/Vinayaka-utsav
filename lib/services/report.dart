@@ -147,6 +147,7 @@ List<String> _expenseRow(Festival f, _Row e, {bool withDate = true}) => [
 List<String> _contribRow(Festival f, _Row c, {bool withDate = true}) => [
       if (withDate) _day(f, '${c['date']}'),
       '${c['name']}',
+      flatLabel(c),
       '${c['mode']}',
       '${c['txnRef'] ?? ''}',
       '${c['status']}',
@@ -182,10 +183,10 @@ Future<void> shareDayReport(Festival f, String day) async {
       ),
       _section('Contributions (${d.contributions.length})'),
       _table(
-        ['Name', 'Mode', 'Txn ref', 'Status', 'Amount'],
+        ['Name', 'Flat', 'Mode', 'Txn ref', 'Status', 'Amount'],
         [for (final c in d.contributions) _contribRow(f, c, withDate: false)],
-        right: {4},
-        total: ['Verified total', '', '', '', _m(d.verified)],
+        right: {5},
+        total: ['Verified total', '', '', '', '', _m(d.verified)],
       ),
       _section('Pooja Seva (${d.signups.length})'),
       _table(['Slot', 'Name', 'Note'],
@@ -227,6 +228,16 @@ Future<void> shareFinalReport(Festival f) async {
     byMode[m] = (byMode[m] ?? 0) + toNum(c['amount']);
   }
 
+  // Contributions by block (verified only).
+  final byBlock = <String, num>{};
+  final flatsByBlock = <String, Set<String>>{};
+  for (final c in d.contributions.where((c) => c['status'] == 'verified')) {
+    final b = '${c['block'] ?? ''}'.isEmpty ? 'Not given' : 'Block ${c['block']}';
+    byBlock[b] = (byBlock[b] ?? 0) + toNum(c['amount']);
+    (flatsByBlock[b] ??= <String>{}).add('${c['flat'] ?? ''}');
+  }
+  final blockRows = byBlock.keys.toList()..sort();
+
   final doc = pw.Document(theme: await _theme(), title: '${f.title} final report');
   doc.addPage(pw.MultiPage(
     pageFormat: PdfPageFormat.a4,
@@ -266,6 +277,13 @@ Future<void> shareFinalReport(Festival f) async {
         right: {1, 2},
         total: ['Total', _m(d.spent), '100%'],
       ),
+      _section('Contributions by block (verified)'),
+      _table(
+        ['Block', 'Flats contributed', 'Amount'],
+        [for (final b in blockRows) [b, '${flatsByBlock[b]!.length}', _m(byBlock[b]!)]],
+        right: {1, 2},
+        total: ['Total', '${flatsByBlock.values.fold<int>(0, (s, v) => s + v.length)}', _m(d.verified)],
+      ),
       _section('Contributions by payment mode (verified)'),
       _table(
         ['Mode', 'Amount'],
@@ -282,10 +300,10 @@ Future<void> shareFinalReport(Festival f) async {
       ),
       _section('All contributions (${d.contributions.length})'),
       _table(
-        ['Day', 'Name', 'Mode', 'Txn ref', 'Status', 'Amount'],
+        ['Day', 'Name', 'Flat', 'Mode', 'Txn ref', 'Status', 'Amount'],
         [for (final c in d.contributions) _contribRow(f, c)],
-        right: {5},
-        total: ['Verified total', '', '', '', '', _m(d.verified)],
+        right: {6},
+        total: ['Verified total', '', '', '', '', '', _m(d.verified)],
       ),
       pw.SizedBox(height: 24),
       pw.Text('Prepared by the committee. Bills and payment screenshots are available in the app.',

@@ -69,7 +69,10 @@ service cloud.firestore {
     match /contributions/{id} {
       allow read: if isMember();
       allow create: if isMember() && createdByMe() && validAmount()
-        && request.resource.data.status == 'pending';
+        && request.resource.data.status == 'pending'
+        && request.resource.data.block in ['A', 'B', 'C']
+        && request.resource.data.flat is string
+        && request.resource.data.flat.size() > 0 && request.resource.data.flat.size() <= 6;
       allow update: if isAdmin() && keepsOwner();
       allow delete: if isAdmin() || (isMember() && ownsDoc() && resource.data.status == 'pending');
     }
