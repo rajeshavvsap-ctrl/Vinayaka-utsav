@@ -118,7 +118,11 @@ jobs:
           export UPLOAD_KEY_PASSWORD=$(printf '%s' "$UPLOAD_KEY_PASSWORD" | tr -d ' \r\n\t')
           export UPLOAD_KEY_ALIAS=$(printf '%s' "$UPLOAD_KEY_ALIAS" | tr -d ' \r\n\t')
           if ! keytool -list -keystore "$UPLOAD_KEYSTORE_PATH" -storepass "$UPLOAD_STORE_PASSWORD" -alias "$UPLOAD_KEY_ALIAS" > /dev/null 2>&1; then
-            echo "::error title=aab::Keystore check failed - the store-password or key-alias secret does not match the key file."
+            if keytool -list -keystore "$UPLOAD_KEYSTORE_PATH" -storepass "$UPLOAD_STORE_PASSWORD" > /dev/null 2>&1; then
+              echo "::error title=aab::Password is correct but the key-alias secret is wrong (it must be the word: upload)."
+            else
+              echo "::error title=aab::The store-password secret is wrong (length ${#UPLOAD_STORE_PASSWORD} characters, expected 20)."
+            fi
             exit 1
           fi
           status=0
