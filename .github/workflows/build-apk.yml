@@ -91,6 +91,8 @@ jobs:
         run: cp build/app/outputs/flutter-apk/app-release.apk vinayaka-utsav.apk
 
       - name: Build Play Store bundle (AAB)
+        # A Play-bundle problem must not stop the APK release.
+        continue-on-error: true
         env:
           UPLOAD_KEYSTORE_BASE64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
           UPLOAD_STORE_PASSWORD: ${{ secrets.UPLOAD_STORE_PASSWORD }}
