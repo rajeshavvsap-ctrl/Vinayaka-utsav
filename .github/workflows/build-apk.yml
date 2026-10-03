@@ -97,8 +97,13 @@ jobs:
           UPLOAD_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
           UPLOAD_KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
         run: |
-          if [ -z "$UPLOAD_KEYSTORE_BASE64" ]; then
-            echo "::notice title=aab::Play Store bundle skipped - add the UPLOAD_* secrets to build it."
+          missing=""
+          [ -z "$UPLOAD_KEYSTORE_BASE64" ] && missing="$missing UPLOAD_KEYSTORE_BASE64"
+          [ -z "$UPLOAD_STORE_PASSWORD" ] && missing="$missing UPLOAD_STORE_PASSWORD"
+          [ -z "$UPLOAD_KEY_PASSWORD" ] && missing="$missing UPLOAD_KEY_PASSWORD"
+          [ -z "$UPLOAD_KEY_ALIAS" ] && missing="$missing UPLOAD_KEY_ALIAS"
+          if [ -n "$missing" ]; then
+            echo "::notice title=aab::Play Store bundle skipped - missing secrets:$missing"
             exit 0
           fi
           echo "$UPLOAD_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
