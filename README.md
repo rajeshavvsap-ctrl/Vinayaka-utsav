@@ -182,3 +182,9 @@ firestore.rules                 server-side access control
 - Photo gallery of the celebrations
 - Telugu / Hindi language option
 - Samagri (pooja items) checklist with "bought / pending"
+
+## Updates and Google Play
+
+- Every push to `main` builds a new version (GitHub Actions). Members who installed from the link get an **"Update available"** pop-up when they open the app.
+- When the `UPLOAD_*` secrets are set, the build also produces `vinayaka-utsav.aab` for Google Play (attached to each release).
+- Privacy policy for the Play listing: `docs/privacy-policy.md`.
