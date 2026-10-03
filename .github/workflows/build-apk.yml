@@ -98,10 +98,10 @@ jobs:
           UPLOAD_KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
         run: |
           missing=""
-          [ -z "$UPLOAD_KEYSTORE_BASE64" ] && missing="$missing UPLOAD_KEYSTORE_BASE64"
-          [ -z "$UPLOAD_STORE_PASSWORD" ] && missing="$missing UPLOAD_STORE_PASSWORD"
-          [ -z "$UPLOAD_KEY_PASSWORD" ] && missing="$missing UPLOAD_KEY_PASSWORD"
-          [ -z "$UPLOAD_KEY_ALIAS" ] && missing="$missing UPLOAD_KEY_ALIAS"
+          [ -z "$UPLOAD_KEYSTORE_BASE64" ] && missing="$missing [keystore-file]"
+          [ -z "$UPLOAD_STORE_PASSWORD" ] && missing="$missing [store-password]"
+          [ -z "$UPLOAD_KEY_PASSWORD" ] && missing="$missing [key-password]"
+          [ -z "$UPLOAD_KEY_ALIAS" ] && missing="$missing [key-alias]"
           if [ -n "$missing" ]; then
             echo "::notice title=aab::Play Store bundle skipped - missing secrets:$missing"
             exit 0
