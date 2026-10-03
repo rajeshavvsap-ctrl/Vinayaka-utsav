@@ -58,7 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
         await auth.signInWithEmailAndPassword(email: _email.text.trim(), password: _pass.text);
       }
     } on FirebaseAuthException catch (e) {
-      if (mounted) setState(() => _error = _authMessage(e.code));
+      if (mounted) setState(() => _error = _authMessage(e.code, e.message));
     } catch (e) {
       if (mounted) setState(() => _error = 'Something went wrong: $e');
     } finally {
@@ -76,11 +76,11 @@ class _LoginScreenState extends State<LoginScreen> {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
       if (mounted) toast(context, 'Password reset link sent to $email');
     } on FirebaseAuthException catch (e) {
-      if (mounted) setState(() => _error = _authMessage(e.code));
+      if (mounted) setState(() => _error = _authMessage(e.code, e.message));
     }
   }
 
-  String _authMessage(String code) {
+  String _authMessage(String code, [String? detail]) {
     switch (code) {
       case 'invalid-email':
         return 'That email address looks wrong.';
@@ -96,8 +96,14 @@ class _LoginScreenState extends State<LoginScreen> {
         return 'No internet connection.';
       case 'too-many-requests':
         return 'Too many attempts. Please wait a few minutes.';
+      case 'operation-not-allowed':
+        return 'Email/Password sign-in is not enabled in Firebase Authentication.';
       default:
-        return 'Could not sign in ($code).';
+        final d = detail ?? '';
+        if (d.contains('CONFIGURATION_NOT_FOUND')) {
+          return 'Firebase Authentication is not set up yet (open Authentication and click Get started).';
+        }
+        return 'Could not sign in ($code). $d';
     }
   }
 
