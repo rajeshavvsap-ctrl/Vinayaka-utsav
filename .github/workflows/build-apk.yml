@@ -159,3 +159,50 @@ jobs:
             vinayaka-utsav.apk
             vinayaka-utsav.aab
           fail_on_unmatched_files: false
+
+  # iPhone build check (unsigned). Proves the app compiles for iOS; signing and
+  # TestFlight upload are added once an Apple Developer account exists.
+  build-ios:
+    runs-on: macos-latest
+    env:
+      BUILD_NO: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create iOS project files
+        run: flutter create . --org com.vinayakautsav --project-name vinayaka_utsav --platforms ios
+
+      - name: iOS settings (name, permissions, minimum iOS)
+        run: |
+          P=ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Delete :CFBundleDisplayName" "$P" || true
+          /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Vinayaka Utsav" "$P"
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string Attach payment screenshots and bills." "$P" || true
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string Take a photo of a bill or receipt." "$P" || true
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" "$P" || true
+          flutter pub get
+          if [ -f ios/Podfile ]; then
+            sed -i '' "s/^# *platform :ios.*/platform :ios, '15.0'/" ios/Podfile
+            grep -n "platform :ios" ios/Podfile || true
+          fi
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*;/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/g' ios/Runner.xcodeproj/project.pbxproj
+
+      - name: App icon
+        run: dart run flutter_launcher_icons -f ci/launcher_icons_ios.yaml
+
+      - name: Build iOS (no signing)
+        run: |
+          status=0
+          flutter build ios --release --no-codesign --build-number=$BUILD_NO --build-name=1.0.$BUILD_NO \
+            --dart-define=CHANNEL=appstore > out.txt 2>&1 || status=$?
+          cat out.txt
+          if [ $status -ne 0 ]; then
+            msg=$(grep -E -B2 -A6 "error:|Error:|Failed|failed" out.txt | head -60 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=ios::$msg"
+          fi
+          exit $status
