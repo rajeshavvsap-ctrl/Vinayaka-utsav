@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../models.dart';
 import '../services/db.dart';
+import '../services/report.dart';
 import '../services/proof_picker.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -29,7 +30,14 @@ class _ContributionsScreenState extends State<ContributionsScreen> {
   Widget build(BuildContext context) {
     final s = widget.session;
     return Scaffold(
-      appBar: AppBar(title: const Text('Contributions')),
+      appBar: AppBar(
+        title: const Text('Contributions'),
+        actions: [
+          PdfAction(
+            make: () => shareContributionsReport(s.festival, filter: _filter, myId: s.me.id),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () =>
             Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddContributionScreen(session: s))),
@@ -232,6 +240,15 @@ class _ContributionsScreenState extends State<ContributionsScreen> {
             DetailRow('Mode', '${c['mode']}'),
             DetailRow('UPI / Txn ref', '${c['txnRef'] ?? ''}'),
             DetailRow('Note', '${c['note'] ?? ''}'),
+            if (c['status'] == 'verified')
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: OutlinedButton.icon(
+                  onPressed: () => shareContributionReceipt(s.festival, c, doc.id),
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  label: const Text('Download receipt (PDF)'),
+                ),
+              ),
             if (!pending) DetailRow(c['status'] == 'verified' ? 'Verified by' : 'Checked by', '${c['verifiedByName'] ?? ''}'),
             const SizedBox(height: 12),
             if (proofId.isNotEmpty)

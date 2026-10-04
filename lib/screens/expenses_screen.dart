@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../services/db.dart';
+import '../services/report.dart';
 import '../services/proof_picker.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -23,7 +24,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Expenses')),
+      appBar: AppBar(
+        title: const Text('Expenses'),
+        actions: [PdfAction(make: () => shareExpensesReport(widget.session.festival, category: _cat))],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.of(context)
             .push(MaterialPageRoute(builder: (_) => AddExpenseScreen(session: widget.session))),

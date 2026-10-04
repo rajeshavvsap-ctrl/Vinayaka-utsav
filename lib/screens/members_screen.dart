@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../services/db.dart';
+import '../services/report.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -15,7 +16,10 @@ class MembersScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Members')),
+      appBar: AppBar(
+        title: const Text('Members'),
+        actions: [if (session.isAdmin) PdfAction(make: () => shareMembersReport(session.festival))],
+      ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: Db.users.snapshots(),
         builder: (context, snap) {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../services/db.dart';
+import '../services/report.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -23,7 +24,10 @@ class _PoojaScreenState extends State<PoojaScreen> {
   Widget build(BuildContext context) {
     final f = widget.session.festival;
     return Scaffold(
-      appBar: AppBar(title: const Text('Pooja Seva')),
+      appBar: AppBar(
+        title: const Text('Pooja Seva'),
+        actions: [PdfAction(make: () => sharePoojaReport(widget.session.festival))],
+      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -351,3 +351,27 @@ class FestivalDayField extends StatelessWidget {
     );
   }
 }
+
+/// App-bar button that builds a PDF and opens the share/save menu.
+class PdfAction extends StatelessWidget {
+  const PdfAction({super.key, required this.make, this.tooltip = 'Download PDF'});
+  final Future<void> Function() make;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      icon: const Icon(Icons.picture_as_pdf_outlined),
+      onPressed: () async {
+        final m = ScaffoldMessenger.of(context);
+        m.showSnackBar(const SnackBar(content: Text('Preparing PDF…'), duration: Duration(seconds: 2)));
+        try {
+          await make();
+        } catch (e) {
+          m.showSnackBar(SnackBar(content: Text('Could not create PDF: $e')));
+        }
+      },
+    );
+  }
+}

@@ -312,3 +312,212 @@ Future<void> shareFinalReport(Festival f) async {
   ));
   await _share(doc, '${f.title.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '-')}-final-report.pdf');
 }
+
+// ---------------------------------------------------------------------------
+// One PDF per tile (download button on each screen) + contribution receipt.
+// ---------------------------------------------------------------------------
+
+Future<pw.Document> _newDoc(Festival f, String what) async =>
+    pw.Document(theme: await _theme(), title: '${f.title} $what');
+
+pw.MultiPage _page(Festival f, String subtitle, List<pw.Widget> body) => pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(32),
+      header: (_) => _header(f, subtitle),
+      footer: _footer,
+      build: (_) => body,
+    );
+
+String _safe(String s) => s.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '-');
+
+/// Activities tile: full day-wise schedule.
+Future<void> shareActivitiesReport(Festival f) async {
+  final d = await _load();
+  final doc = await _newDoc(f, 'activities');
+  doc.addPage(_page(f, 'Festival schedule (${d.activities.length} activities)', [
+    for (final day in f.dayKeys) ...[
+      _section('${_day(f, day)} · ${prettyDay(day)}'),
+      _table(['Time', 'Activity', 'Place', 'Coordinator', 'Notes'], [
+        for (final a in d.activities.where((a) => a['date'] == day))
+          [
+            prettyTime('${a['time']}'),
+            '${a['title']}',
+            '${a['place'] ?? ''}',
+            '${a['coordinator'] ?? ''}',
+            '${a['notes'] ?? ''}',
+          ]
+      ]),
+    ],
+  ]));
+  await _share(doc, 'Activities-schedule.pdf');
+}
+
+/// Pooja Seva tile: names for every day and slot.
+Future<void> sharePoojaReport(Festival f) async {
+  final d = await _load();
+  final doc = await _newDoc(f, 'pooja seva');
+  doc.addPage(_page(f, 'Pooja Seva list (${d.signups.length} names)', [
+    _table(
+      ['Day', for (final s in f.slots) s, 'Total'],
+      [
+        for (final day in f.dayKeys)
+          [
+            _day(f, day),
+            for (final s in f.slots) '${d.signups.where((x) => x['date'] == day && x['slot'] == s).length}',
+            '${d.signups.where((x) => x['date'] == day).length}',
+          ]
+      ],
+      right: {for (var i = 1; i <= f.slots.length + 1; i++) i},
+    ),
+    for (final day in f.dayKeys) ...[
+      _section('${_day(f, day)} · ${prettyDay(day)}'),
+      _table(['Slot', 'Name', 'Note'], [
+        for (final x in d.signups.where((x) => x['date'] == day)) ['${x['slot']}', '${x['name']}', '${x['note'] ?? ''}']
+      ]),
+    ],
+  ]));
+  await _share(doc, 'Pooja-Seva-list.pdf');
+}
+
+/// Expenses tile: all expenses, or one category when a filter is selected.
+Future<void> shareExpensesReport(Festival f, {String category = 'All'}) async {
+  final d = await _load();
+  final rows = category == 'All' ? d.expenses : d.expenses.where((e) => e['category'] == category).toList();
+  final total = rows.fold<num>(0, (s, e) => s + toNum(e['amount']));
+  final byCat = <String, num>{};
+  for (final e in rows) {
+    byCat['${e['category']}'] = (byCat['${e['category']}'] ?? 0) + toNum(e['amount']);
+  }
+  final doc = await _newDoc(f, 'expenses');
+  doc.addPage(_page(f, category == 'All' ? 'Expenses report' : 'Expenses report · $category', [
+    _summary([
+      ['Total spent', _m(total)],
+      ['Bills', '${rows.length}'],
+      ['With bill photo', '${rows.where((e) => '${e['proofId'] ?? ''}'.isNotEmpty).length}'],
+    ]),
+    if (category == 'All') ...[
+      _section('By category'),
+      _table(
+        ['Category', 'Amount'],
+        [for (final e in (byCat.entries.toList()..sort((a, b) => b.value.compareTo(a.value)))) [e.key, _m(e.value)]],
+        right: {1},
+        total: ['Total', _m(total)],
+      ),
+    ],
+    _section('All expenses'),
+    _table(
+      ['Day', 'Item', 'Category', 'Paid by', 'Mode', 'Bill', 'Amount'],
+      [for (final e in rows) _expenseRow(f, e)],
+      right: {6},
+      total: ['Total', '', '', '', '', '', _m(total)],
+    ),
+  ]));
+  await _share(doc, category == 'All' ? 'Expenses-report.pdf' : 'Expenses-${_safe(category)}.pdf');
+}
+
+/// Contributions tile: honours the All / Pending / Verified / Mine filter.
+Future<void> shareContributionsReport(Festival f, {String filter = 'All', String? myId}) async {
+  final d = await _load();
+  final rows = d.contributions.where((c) {
+    switch (filter) {
+      case 'Pending':
+        return c['status'] == 'pending';
+      case 'Verified':
+        return c['status'] == 'verified';
+      case 'Mine':
+        return c['createdBy'] == myId;
+      default:
+        return true;
+    }
+  }).toList();
+  num sum(String st) => rows.where((c) => c['status'] == st).fold<num>(0, (s, c) => s + toNum(c['amount']));
+  final byBlock = <String, num>{};
+  for (final c in rows.where((c) => c['status'] == 'verified')) {
+    final b = '${c['block'] ?? ''}'.isEmpty ? 'Not given' : 'Block ${c['block']}';
+    byBlock[b] = (byBlock[b] ?? 0) + toNum(c['amount']);
+  }
+  final doc = await _newDoc(f, 'contributions');
+  doc.addPage(_page(f, filter == 'All' ? 'Contributions report' : 'Contributions report · $filter', [
+    _summary([
+      ['Verified', _m(sum('verified'))],
+      ['Pending', _m(sum('pending'))],
+      ['Entries', '${rows.length}'],
+    ]),
+    if (byBlock.isNotEmpty) ...[
+      _section('Verified by block'),
+      _table(
+        ['Block', 'Amount'],
+        [for (final b in (byBlock.keys.toList()..sort())) [b, _m(byBlock[b]!)]],
+        right: {1},
+        total: ['Total', _m(sum('verified'))],
+      ),
+    ],
+    _section('Entries'),
+    _table(
+      ['Day', 'Name', 'Flat', 'Mode', 'Txn ref', 'Status', 'Amount'],
+      [for (final c in rows) _contribRow(f, c)],
+      right: {6},
+      total: ['Verified total', '', '', '', '', '', _m(sum('verified'))],
+    ),
+  ]));
+  await _share(doc, filter == 'All' ? 'Contributions-report.pdf' : 'Contributions-${_safe(filter)}.pdf');
+}
+
+/// Members tile (admins): committee member list.
+Future<void> shareMembersReport(Festival f) async {
+  final snap = await Db.users.get();
+  final all = snap.docs.map((d) => d.data()).toList()
+    ..sort((a, b) => '${a['name']}'.toLowerCase().compareTo('${b['name']}'.toLowerCase()));
+  final doc = await _newDoc(f, 'members');
+  doc.addPage(_page(f, 'Committee members', [
+    _table(
+      ['Name', 'Mobile', 'Email', 'Role', 'Status'],
+      [for (final m in all) ['${m['name']}', '${m['phone']}', '${m['email']}', '${m['role']}', '${m['status']}']],
+    ),
+  ]));
+  await _share(doc, 'Committee-members.pdf');
+}
+
+/// A printable receipt for one verified contribution.
+Future<void> shareContributionReceipt(Festival f, Map<String, dynamic> c, String id) async {
+  final doc = await _newDoc(f, 'receipt');
+  final no = id.length > 8 ? id.substring(0, 8).toUpperCase() : id.toUpperCase();
+  doc.addPage(pw.Page(
+    pageFormat: PdfPageFormat.a5,
+    margin: const pw.EdgeInsets.all(28),
+    build: (_) => pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(f.title, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: _maroon)),
+        pw.Text('Contribution receipt', style: const pw.TextStyle(fontSize: 13)),
+        pw.Divider(color: _maroon, thickness: 1.5),
+        pw.SizedBox(height: 6),
+        for (final r in [
+          ['Receipt no.', no],
+          ['Received from', '${c['name']}'],
+          ['Block / flat', flatLabel(c)],
+          ['Amount', _m(toNum(c['amount']))],
+          ['Paid by', '${c['mode']}'],
+          ['Reference', '${c['txnRef'] ?? ''}'],
+          ['Payment date', prettyDay('${c['date']}')],
+          ['Status', '${c['status']}'.toUpperCase()],
+          ['Verified by', '${c['verifiedByName'] ?? ''}'],
+        ])
+          if (r[1].trim().isNotEmpty)
+            pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(vertical: 4),
+              child: pw.Row(children: [
+                pw.SizedBox(width: 110, child: pw.Text(r[0], style: pw.TextStyle(color: _muted, fontSize: 11))),
+                pw.Expanded(child: pw.Text(r[1], style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold))),
+              ]),
+            ),
+        pw.Spacer(),
+        pw.Text('Thank you for your contribution. Ganapati Bappa Morya!',
+            style: pw.TextStyle(fontSize: 11, color: _maroon)),
+        pw.Text('Generated ${DateFormat('d MMM yyyy, h:mm a').format(DateTime.now())}',
+            style: pw.TextStyle(fontSize: 8, color: _muted)),
+      ],
+    ),
+  ));
+  await _share(doc, 'Receipt-$no.pdf');
+}

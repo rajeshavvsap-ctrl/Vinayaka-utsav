@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../services/db.dart';
+import '../services/report.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -22,7 +23,10 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
   Widget build(BuildContext context) {
     final f = widget.session.festival;
     return Scaffold(
-      appBar: AppBar(title: const Text('Activities')),
+      appBar: AppBar(
+        title: const Text('Activities'),
+        actions: [PdfAction(make: () => shareActivitiesReport(widget.session.festival))],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _edit(context, null),
         icon: const Icon(Icons.add),
