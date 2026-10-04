@@ -102,7 +102,6 @@ jobs:
           missing=""
           [ -z "$UPLOAD_KEYSTORE_BASE64" ] && missing="$missing [keystore-file]"
           [ -z "$UPLOAD_STORE_PASSWORD" ] && missing="$missing [store-password]"
-          [ -z "$UPLOAD_KEY_PASSWORD" ] && missing="$missing [key-password]"
           if [ -n "$missing" ]; then
             echo "::notice title=aab::Play Store bundle skipped - missing secrets:$missing"
             exit 0
@@ -114,7 +113,7 @@ jobs:
           fi
           export UPLOAD_KEYSTORE_PATH="$RUNNER_TEMP/upload.jks"
           export UPLOAD_STORE_PASSWORD=$(printf '%s' "$UPLOAD_STORE_PASSWORD" | tr -d ' \r\n\t')
-          export UPLOAD_KEY_PASSWORD=$(printf '%s' "$UPLOAD_KEY_PASSWORD" | tr -d ' \r\n\t')
+          export UPLOAD_KEY_PASSWORD="$UPLOAD_STORE_PASSWORD"   # PKCS12 keys use the store password
           export UPLOAD_KEY_ALIAS=upload   # the alias is not secret; fixed value avoids copy-paste mistakes
           if ! keytool -list -keystore "$UPLOAD_KEYSTORE_PATH" -storepass "$UPLOAD_STORE_PASSWORD" -alias "$UPLOAD_KEY_ALIAS" > /dev/null 2>&1; then
             if keytool -list -keystore "$UPLOAD_KEYSTORE_PATH" -storepass "$UPLOAD_STORE_PASSWORD" > /dev/null 2>&1; then
