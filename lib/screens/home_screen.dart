@@ -1,19 +1,15 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models.dart';
-import '../services/account.dart';
 import '../services/db.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'activities_screen.dart';
 import 'contributions_screen.dart';
 import 'expenses_screen.dart';
-import 'members_screen.dart';
 import 'pooja_screen.dart';
 import 'reports_screen.dart';
 import 'settings_screen.dart';
@@ -28,6 +24,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _subs = <StreamSubscription<dynamic>>[];
+  String get _ev => widget.session.festival.id;
   num _collected = 0;
   num _pendingContrib = 0;
   int _pendingContribCount = 0;
@@ -35,8 +32,6 @@ class _HomeScreenState extends State<HomeScreen> {
   int _expenseCount = 0;
   int _todayActivities = 0;
   int _todaySignups = 0;
-  int _memberCount = 0;
-  int _pendingMembers = 0;
   Map<String, dynamic>? _next; // next activity today
 
   @override
@@ -49,11 +44,11 @@ class _HomeScreenState extends State<HomeScreen> {
       var pc = 0;
       for (final d in s.docs) {
         final m = d.data();
+        if (!inEvent(m, _ev)) continue;
         if (m['status'] == 'verified') v += toNum(m['amount']);
         if (m['status'] == 'pending') {
           p += toNum(m['amount']);
           pc++;
-          if (m['createdBy'] != widget.session.me.id) _enqueue('payment', d);
         }
       }
       if (mounted) {
@@ -67,13 +62,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _subs.add(Db.expenses.snapshots().listen((s) {
       num t = 0;
+      var n = 0;
       for (final d in s.docs) {
+        if (!inEvent(d.data(), _ev)) continue;
         t += toNum(d.data()['amount']);
+        n++;
       }
       if (mounted) {
         setState(() {
           _spent = t;
-          _expenseCount = s.size;
+          _expenseCount = n;
         });
       }
     }, onError: (Object _) {}));
@@ -81,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _subs.add(Db.activities.where('date', isEqualTo: today).snapshots().listen((s) {
       final now = TimeOfDay.now();
       final nowKey = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-      final list = s.docs.map((d) => d.data()).toList()
+      final list = s.docs.map((d) => d.data()).where((m) => inEvent(m, _ev)).toList()
         ..sort((a, b) => '${a['time']}'.compareTo('${b['time']}'));
       Map<String, dynamic>? next;
       for (final a in list) {
@@ -92,33 +90,17 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       if (mounted) {
         setState(() {
-          _todayActivities = s.size;
+          _todayActivities = list.length;
           _next = next;
         });
       }
     }, onError: (Object _) {}));
 
     _subs.add(Db.poojaSignups.where('date', isEqualTo: today).snapshots().listen((s) {
-      if (mounted) setState(() => _todaySignups = s.size);
+      final n = s.docs.where((d) => inEvent(d.data(), _ev)).length;
+      if (mounted) setState(() => _todaySignups = n);
     }, onError: (Object _) {}));
 
-    _subs.add(Db.users.snapshots().listen((s) {
-      var approved = 0, pending = 0;
-      for (final d in s.docs) {
-        final st = d.data()['status'];
-        if (st == 'approved') approved++;
-        if (st == 'pending') {
-          pending++;
-          _enqueue('member', d);
-        }
-      }
-      if (mounted) {
-        setState(() {
-          _memberCount = approved;
-          _pendingMembers = pending;
-        });
-      }
-    }, onError: (Object _) {}));
   }
 
   @override
@@ -129,135 +111,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  // ---------- approval pop-ups (admins only) ----------
-  // While the app is open, every new member request and every new payment
-  // waiting for verification pops up, one at a time, with action buttons.
-  final _prompted = <String>{};
-  final _queue = <DocumentReference<Map<String, dynamic>>>[];
-  bool _showing = false;
-
-  void _enqueue(String kind, QueryDocumentSnapshot<Map<String, dynamic>> d) {
-    if (!widget.session.isAdmin) return;
-    if (!_prompted.add('$kind/${d.id}')) return;
-    _queue.add(d.reference);
-    _showNext();
-  }
-
-  Future<void> _showNext() async {
-    if (_showing || _queue.isEmpty || !mounted) return;
-    _showing = true;
-    final ref = _queue.removeAt(0);
-    try {
-      final fresh = await ref.get();
-      if (mounted && fresh.data()?['status'] == 'pending') {
-        if (ref.parent.id == 'users') {
-          await _memberDialog(fresh);
-        } else {
-          await _paymentDialog(fresh);
-        }
-      }
-    } catch (_) {
-      // Ignore; the item is still visible in its screen.
-    }
-    _showing = false;
-    if (mounted) _showNext();
-  }
-
-  Future<void> _memberDialog(DocumentSnapshot<Map<String, dynamic>> d) async {
-    final m = d.data()!;
-    final action = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (c) => AlertDialog(
-        icon: const Icon(Icons.person_add_alt_1_outlined, color: AppColors.blue, size: 36),
-        title: const Text('New member request'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${m['name']}', style: display(20)),
-            const SizedBox(height: 6),
-            Text('Mobile: ${m['phone']}'),
-            Text('Email: ${m['email']}'),
-            const SizedBox(height: 10),
-            const Text('Approve only committee members.', style: TextStyle(color: AppColors.muted, fontSize: 13)),
-          ],
-        ),
-        actions: _actions(c, 'Approve'),
-      ),
-    );
-    if (action == 'ok' || action == 'reject') {
-      try {
-        await d.reference.update({'status': action == 'ok' ? 'approved' : 'rejected'});
-        if (mounted) toast(context, '${m['name']} ${action == 'ok' ? 'approved' : 'rejected'}');
-      } catch (e) {
-        if (mounted) toast(context, 'Could not update: $e');
-      }
-    }
-  }
-
-  Future<void> _paymentDialog(DocumentSnapshot<Map<String, dynamic>> d) async {
-    final c = d.data()!;
-    final proofId = '${c['proofId'] ?? ''}';
-    final action = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.volunteer_activism_outlined, color: AppColors.purple, size: 36),
-        title: const Text('Payment to verify'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('${c['name']}', style: display(20)),
-                Text(rupees(toNum(c['amount'])), style: display(26, color: AppColors.maroon)),
-                if (flatLabel(c).isNotEmpty) Text('Flat: ${flatLabel(c)}'),
-                Text('${c['mode']} · ${prettyDay('${c['date']}')}'),
-                if ('${c['txnRef'] ?? ''}'.isNotEmpty) Text('Ref: ${c['txnRef']}'),
-                const SizedBox(height: 10),
-                if (proofId.isNotEmpty)
-                  ProofImage(proofId: proofId, height: 240)
-                else
-                  const Text('No screenshot attached.', style: TextStyle(color: AppColors.muted)),
-              ],
-            ),
-          ),
-        ),
-        actions: _actions(ctx, 'Verify'),
-      ),
-    );
-    if (action == 'ok' || action == 'reject') {
-      try {
-        await d.reference.update({
-          'status': action == 'ok' ? 'verified' : 'rejected',
-          'verifiedBy': widget.session.me.id,
-          'verifiedByName': widget.session.me.name,
-          'verifiedAt': FieldValue.serverTimestamp(),
-        });
-        if (mounted) toast(context, 'Payment ${action == 'ok' ? 'verified' : 'rejected'}');
-      } catch (e) {
-        if (mounted) toast(context, 'Could not update: $e');
-      }
-    }
-  }
-
-  List<Widget> _actions(BuildContext c, String okLabel) => [
-        TextButton(onPressed: () => Navigator.pop(c, 'later'), child: const Text('Later')),
-        TextButton(
-          onPressed: () => Navigator.pop(c, 'reject'),
-          style: TextButton.styleFrom(foregroundColor: AppColors.red),
-          child: const Text('Reject'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(c, 'ok'),
-          style: FilledButton.styleFrom(backgroundColor: AppColors.green, minimumSize: const Size(96, 44)),
-          child: Text(okLabel),
-        ),
-      ];
-
   void _open(Widget screen) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
 
   void _copySummary() {
@@ -267,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
         'Pending verification: ${rupees(_pendingContrib)}\n'
         'Spent ($_expenseCount bills): ${rupees(_spent)}\n'
         'Balance: ${rupees(_collected - _spent)}\n'
-        'Ganapati Bappa Morya!';
+        '${f.id == 'vinayaka' ? 'Ganapati Bappa Morya!' : 'Horizon Committee'}';
     Clipboard.setData(ClipboardData(text: text));
     toast(context, 'Summary copied. Paste it in WhatsApp.');
   }
@@ -282,7 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final tiles = <_Tile>[
       _Tile('Activities', '$_todayActivities today', Icons.event_note_outlined, AppColors.amberBg, AppColors.amber,
           () => _open(ActivitiesScreen(session: s))),
-      _Tile('Pooja Seva', '$_todaySignups names today', Icons.local_florist_outlined, AppColors.greenBg,
+      _Tile(f.sevaLabel, '$_todaySignups names today', Icons.local_florist_outlined, AppColors.greenBg,
           AppColors.green, () => _open(PoojaScreen(session: s))),
       _Tile('Expenses', rupees(_spent), Icons.receipt_long_outlined, AppColors.redBg, AppColors.maroon,
           () => _open(ExpensesScreen(session: s))),
@@ -294,14 +147,6 @@ class _HomeScreenState extends State<HomeScreen> {
           AppColors.purple,
           () => _open(ContributionsScreen(session: s)),
           badge: s.isAdmin ? _pendingContribCount : 0),
-      _Tile(
-          'Members',
-          s.isAdmin && _pendingMembers > 0 ? '$_pendingMembers to approve' : '$_memberCount members',
-          Icons.groups_outlined,
-          AppColors.blueBg,
-          AppColors.blue,
-          () => _open(MembersScreen(session: s)),
-          badge: s.isAdmin ? _pendingMembers : 0),
       if (s.isAdmin)
         _Tile('Reports', 'Day-wise & final PDF', Icons.picture_as_pdf_outlined, AppColors.greenBg,
             AppColors.green, () => _open(ReportsScreen(session: s))),
@@ -319,38 +164,26 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: AppColors.maroon,
                 borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
               ),
-              padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 16, 12, 22),
+              padding: EdgeInsets.fromLTRB(8, MediaQuery.of(context).padding.top + 12, 16, 22),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
+                      IconButton(
+                        tooltip: 'All events',
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      ),
+                      const SizedBox(width: 4),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Namaste, ${s.me.name.split(' ').first}',
-                                style: const TextStyle(color: AppColors.gold, fontSize: 14)),
-                            Text(f.title, style: display(26, color: Colors.white)),
+                            const Text('Horizon Committee', style: TextStyle(color: AppColors.gold, fontSize: 14)),
+                            Text(f.title, style: display(24, color: Colors.white)),
                           ],
                         ),
-                      ),
-                      PopupMenuButton<String>(
-                        tooltip: 'Menu',
-                        icon: const Icon(Icons.more_vert, color: Colors.white),
-                        onSelected: (v) async {
-                          if (v == 'out' &&
-                              await confirmDialog(context, 'Sign out?', 'You can sign in again any time.')) {
-                            await FirebaseAuth.instance.signOut();
-                          } else if (v == 'delete') {
-                            await deleteMyAccount(context);
-                          }
-                        },
-                        itemBuilder: (_) => [
-                          PopupMenuItem(enabled: false, child: Text('${s.me.name}${s.isAdmin ? ' (Admin)' : ''}')),
-                          const PopupMenuItem(value: 'out', child: Text('Sign out')),
-                          const PopupMenuItem(value: 'delete', child: Text('Delete my account')),
-                        ],
                       ),
                     ],
                   ),
@@ -397,7 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Icon(Icons.info_outline, color: AppColors.amber),
                       SizedBox(width: 10),
                       Expanded(
-                          child: Text('Set the festival start date, pooja slots and UPI ID in Settings.',
+                          child: Text('Set this event\'s start date, number of days, slots and UPI ID in Settings.',
                               style: TextStyle(color: AppColors.amber, fontWeight: FontWeight.w600))),
                       Icon(Icons.chevron_right, color: AppColors.amber),
                     ],
@@ -457,9 +290,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final start = f.start;
     if (DateTime(today.year, today.month, today.day).isBefore(start)) {
       final days = start.difference(DateTime(today.year, today.month, today.day)).inDays;
-      return 'Festival starts in $days day${days == 1 ? '' : 's'}';
+      return 'Starts in $days day${days == 1 ? '' : 's'}';
     }
-    return 'Festival completed';
+    return 'Event completed';
   }
 }
 

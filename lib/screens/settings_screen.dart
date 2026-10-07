@@ -39,7 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _busy = true);
     final slots = _slots.text.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
     try {
-      await Db.festival.set({
+      await Db.eventDoc(widget.festival.id).set({
         'title': _title.text.trim(),
         'startDate': Timestamp.fromDate(DateTime(_start.year, _start.month, _start.day)),
         'days': int.parse(_days.text.trim()),
@@ -63,7 +63,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Festival settings')),
+      appBar: AppBar(title: Text('${widget.festival.title} settings')),
       body: Form(
         key: _form,
         child: ListView(
@@ -84,11 +84,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             TextFormField(
               controller: _days,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Number of festival days (e.g. 5)',
+              decoration: const InputDecoration(labelText: 'Number of event days (1–31)',
                 helperText: 'Members can only pick dates inside these days.'),
               validator: (v) {
                 final n = int.tryParse((v ?? '').trim());
-                return n == null || n < 1 || n > 21 ? 'Enter 1 to 21' : null;
+                return n == null || n < 1 || n > 31 ? 'Enter 1 to 31' : null;
               },
             ),
             const SizedBox(height: 12),

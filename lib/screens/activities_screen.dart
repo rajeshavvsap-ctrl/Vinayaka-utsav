@@ -46,7 +46,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
               builder: (context, snap) {
                 if (snap.hasError) return LoadErrorView(snap.error);
                 if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-                final docs = snap.data!.docs.toList()
+                final docs = snap.data!.docs.where((d) => inEvent(d.data(), widget.session.festival.id)).toList()
                   ..sort((a, b) => '${a.data()['time']}'.compareTo('${b.data()['time']}'));
                 if (docs.isEmpty) {
                   return const EmptyHint(
@@ -190,7 +190,7 @@ class _ActivityFormState extends State<_ActivityForm> {
     };
     try {
       if (widget.doc == null) {
-        await Db.activities.add({...data, ...Db.stamp()});
+        await Db.activities.add({...data, 'eventId': widget.session.festival.id, ...Db.stamp()});
       } else {
         await widget.doc!.reference.update(data);
       }

@@ -39,7 +39,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         builder: (context, snap) {
           if (snap.hasError) return LoadErrorView(snap.error);
           if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-          final all = snap.data!.docs.toList()
+          final all = snap.data!.docs.where((d) => inEvent(d.data(), widget.session.festival.id)).toList()
             ..sort((a, b) {
               final byDate = '${b.data()['date']}'.compareTo('${a.data()['date']}');
               if (byDate != 0) return byDate;
@@ -245,6 +245,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         'note': _note.text.trim(),
         'date': _day,
         'proofId': proofId,
+        'eventId': widget.session.festival.id,
         ...Db.stamp(),
       });
       if (mounted) {

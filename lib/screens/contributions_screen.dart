@@ -49,7 +49,7 @@ class _ContributionsScreenState extends State<ContributionsScreen> {
         builder: (context, snap) {
           if (snap.hasError) return LoadErrorView(snap.error);
           if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-          final all = snap.data!.docs.toList()
+          final all = snap.data!.docs.where((d) => inEvent(d.data(), widget.session.festival.id)).toList()
             ..sort((a, b) {
               // Pending first, then newest date.
               final pa = a.data()['status'] == 'pending' ? 0 : 1;
@@ -424,6 +424,7 @@ class _AddContributionScreenState extends State<AddContributionScreen> {
         'date': _day,
         'proofId': proofId,
         'status': 'pending',
+        'eventId': widget.session.festival.id,
         ...Db.stamp(),
       });
       if (mounted) {

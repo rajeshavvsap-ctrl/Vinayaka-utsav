@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../models.dart';
+
 /// Thin wrapper over the Firestore collections the app uses.
 class Db {
   Db._();
@@ -19,6 +21,12 @@ class Db {
   static CollectionReference<Map<String, dynamic>> get proofs => fs.collection('proofs');
   static DocumentReference<Map<String, dynamic>> get festival =>
       fs.collection('settings').doc('festival');
+  static CollectionReference<Map<String, dynamic>> get settings => fs.collection('settings');
+  static DocumentReference<Map<String, dynamic>> eventDoc(String eventId) =>
+      settings.doc(settingsDocId(eventId));
+
+  /// Extra events added by admins: settings/eventList {custom: [{id, title}]}.
+  static DocumentReference<Map<String, dynamic>> get eventList => settings.doc('eventList');
 
   /// Fields every created record carries (checked by the security rules).
   static Map<String, dynamic> stamp() => {

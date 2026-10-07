@@ -35,9 +35,43 @@ class Member {
   }
 }
 
-/// Festival settings (doc `settings/festival`), edited by admins.
+/// A committee event type with its defaults (Navaratri, Vinayaka Chavithi, ...).
+class EventDef {
+  const EventDef(this.id, this.title, this.days, this.slots, this.sevaLabel, this.icon);
+  final String id;
+  final String title;
+  final int days;
+  final List<String> slots;
+  final String sevaLabel; // name of the sign-up tile: "Pooja Seva" or "Volunteers"
+  final String icon; // durga | ganesha | party | event
+}
+
+const defaultEvents = [
+  EventDef('navaratri', 'Vijaya Dasami – Navaratri', 10, ['Morning Pooja', 'Evening Aarti'], 'Pooja Seva', 'durga'),
+  EventDef('vinayaka', 'Vinayaka Chavithi', 5, ['Morning Pooja', 'Evening Aarti'], 'Pooja Seva', 'ganesha'),
+  EventDef('newyear', '31st Night Celebration', 1, ['Decoration', 'Food', 'Cultural programme'], 'Volunteers', 'party'),
+  EventDef('general', 'General Events', 1, ['Volunteers'], 'Volunteers', 'event'),
+];
+
+EventDef eventDefFor(String id, {String? title}) => defaultEvents.firstWhere(
+      (e) => e.id == id,
+      orElse: () => EventDef(id, title ?? 'Event', 1, const ['Volunteers'], 'Volunteers', 'event'),
+    );
+
+/// Each event's settings live in `settings/<doc>`. Vinayaka keeps the
+/// original `settings/festival` doc so existing data stays as it is.
+String settingsDocId(String eventId) => eventId == 'vinayaka' ? 'festival' : 'event_$eventId';
+
+/// Records created before events existed belong to Vinayaka Chavithi.
+String eventOf(Map<String, dynamic> m) => '${m['eventId'] ?? 'vinayaka'}';
+bool inEvent(Map<String, dynamic> m, String eventId) => eventOf(m) == eventId;
+
+/// One event's settings (title, dates, slots, UPI), edited by admins.
 class Festival {
   const Festival({
+    this.id = 'vinayaka',
+    this.sevaLabel = 'Pooja Seva',
+    this.icon = 'ganesha',
     required this.title,
     required this.start,
     required this.days,
@@ -48,6 +82,9 @@ class Festival {
 
   static const defaultSlots = ['Morning Pooja', 'Evening Aarti'];
 
+  final String id;
+  final String sevaLabel;
+  final String icon;
   final String title;
   final DateTime start;
   final int days;
@@ -55,21 +92,25 @@ class Festival {
   final String upiId;
   final bool configured;
 
-  factory Festival.fromMap(Map<String, dynamic>? m) {
+  factory Festival.fromMap(Map<String, dynamic>? m, {String id = 'vinayaka', String? title}) {
+    final def = eventDefFor(id, title: title);
     final now = DateTime.now();
     final ts = m?['startDate'];
     final s = ts is Timestamp ? ts.toDate() : now;
     final rawDays = m?['days'];
-    final days = rawDays is num ? rawDays.toInt().clamp(1, 21).toInt() : 5;
+    final days = rawDays is num ? rawDays.toInt().clamp(1, 31).toInt() : def.days;
     final rawSlots = m?['poojaSlots'];
     final slots = rawSlots is List
         ? rawSlots.map((e) => '$e'.trim()).where((e) => e.isNotEmpty).toList()
         : <String>[];
     return Festival(
-      title: '${m?['title'] ?? 'Vinayaka Chaturthi'}',
+      id: id,
+      sevaLabel: '${m?['sevaLabel'] ?? def.sevaLabel}',
+      icon: def.icon,
+      title: '${m?['title'] ?? def.title}',
       start: DateTime(s.year, s.month, s.day),
       days: days,
-      slots: slots.isEmpty ? defaultSlots : slots,
+      slots: slots.isEmpty ? def.slots : slots,
       upiId: '${m?['upiId'] ?? ''}',
       configured: m != null && ts is Timestamp,
     );

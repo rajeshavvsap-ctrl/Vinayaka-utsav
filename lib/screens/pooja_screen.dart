@@ -25,7 +25,7 @@ class _PoojaScreenState extends State<PoojaScreen> {
     final f = widget.session.festival;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pooja Seva'),
+        title: Text(widget.session.festival.sevaLabel),
         actions: [PdfAction(make: () => sharePoojaReport(widget.session.festival))],
       ),
       body: Column(
@@ -42,7 +42,7 @@ class _PoojaScreenState extends State<PoojaScreen> {
               builder: (context, snap) {
                 if (snap.hasError) return LoadErrorView(snap.error);
                 if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-                final docs = snap.data!.docs.toList()
+                final docs = snap.data!.docs.where((d) => inEvent(d.data(), widget.session.festival.id)).toList()
                   ..sort((a, b) => '${a.data()['name']}'.toLowerCase().compareTo('${b.data()['name']}'.toLowerCase()));
 
                 final slots = [...f.slots];
@@ -187,7 +187,8 @@ class _PoojaScreenState extends State<PoojaScreen> {
           'slot': slot,
           'name': name.text.trim(),
           'note': note.text.trim(),
-          ...Db.stamp(),
+          'eventId': widget.session.festival.id,
+        ...Db.stamp(),
         });
         if (context.mounted) toast(context, 'Added to $slot');
       } catch (e) {

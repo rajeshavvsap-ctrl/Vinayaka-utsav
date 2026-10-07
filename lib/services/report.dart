@@ -32,11 +32,11 @@ class _Data {
       .fold<num>(0, (s, c) => s + toNum(c['amount']));
 }
 
-Future<_Data> _load({String? day}) async {
+Future<_Data> _load(Festival f, {String? day}) async {
   Future<List<_Row>> q(CollectionReference<_Row> c) async {
     final Query<_Row> query = day == null ? c : c.where('date', isEqualTo: day);
     final snap = await query.get();
-    return snap.docs.map((d) => d.data()).toList();
+    return snap.docs.map((d) => d.data()).where((m) => inEvent(m, f.id)).toList();
   }
 
   final results = await Future.wait([
@@ -160,7 +160,7 @@ Future<void> _share(pw.Document doc, String filename) async {
 
 /// Everything recorded for one festival day.
 Future<void> shareDayReport(Festival f, String day) async {
-  final d = await _load(day: day);
+  final d = await _load(f, day: day);
   final doc = pw.Document(theme: await _theme(), title: '${f.title} ${_day(f, day)}');
   doc.addPage(pw.MultiPage(
     pageFormat: PdfPageFormat.a4,
@@ -203,7 +203,7 @@ Future<void> shareDayReport(Festival f, String day) async {
 
 /// Final accounts for the whole festival.
 Future<void> shareFinalReport(Festival f) async {
-  final d = await _load();
+  final d = await _load(f);
 
   // Expenses by category.
   final byCat = <String, num>{};
@@ -332,7 +332,7 @@ String _safe(String s) => s.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '-');
 
 /// Activities tile: full day-wise schedule.
 Future<void> shareActivitiesReport(Festival f) async {
-  final d = await _load();
+  final d = await _load(f);
   final doc = await _newDoc(f, 'activities');
   doc.addPage(_page(f, 'Festival schedule (${d.activities.length} activities)', [
     for (final day in f.dayKeys) ...[
@@ -354,7 +354,7 @@ Future<void> shareActivitiesReport(Festival f) async {
 
 /// Pooja Seva tile: names for every day and slot.
 Future<void> sharePoojaReport(Festival f) async {
-  final d = await _load();
+  final d = await _load(f);
   final doc = await _newDoc(f, 'pooja seva');
   doc.addPage(_page(f, 'Pooja Seva list (${d.signups.length} names)', [
     _table(
@@ -381,7 +381,7 @@ Future<void> sharePoojaReport(Festival f) async {
 
 /// Expenses tile: all expenses, or one category when a filter is selected.
 Future<void> shareExpensesReport(Festival f, {String category = 'All'}) async {
-  final d = await _load();
+  final d = await _load(f);
   final rows = category == 'All' ? d.expenses : d.expenses.where((e) => e['category'] == category).toList();
   final total = rows.fold<num>(0, (s, e) => s + toNum(e['amount']));
   final byCat = <String, num>{};
@@ -417,7 +417,7 @@ Future<void> shareExpensesReport(Festival f, {String category = 'All'}) async {
 
 /// Contributions tile: honours the All / Pending / Verified / Mine filter.
 Future<void> shareContributionsReport(Festival f, {String filter = 'All', String? myId}) async {
-  final d = await _load();
+  final d = await _load(f);
   final rows = d.contributions.where((c) {
     switch (filter) {
       case 'Pending':

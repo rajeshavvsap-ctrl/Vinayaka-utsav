@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../services/db.dart';
 import '../widgets/common.dart';
-import 'home_screen.dart';
+import 'committee_home.dart';
 import 'login_screen.dart';
 import 'pending_screen.dart';
 
@@ -43,15 +43,7 @@ class _ProfileGate extends StatelessWidget {
         if (!snap.data!.exists) return ProfileSetupScreen(user: user);
         final me = Member.fromDoc(snap.data!);
         if (!me.isApproved) return PendingScreen(member: me);
-        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: Db.festival.snapshots(),
-          builder: (context, fSnap) {
-            if (fSnap.hasError) return Scaffold(body: LoadErrorView(fSnap.error));
-            if (!fSnap.hasData) return const Loading();
-            final festival = Festival.fromMap(fSnap.data!.data());
-            return HomeScreen(session: Session(me, festival));
-          },
-        );
+        return CommitteeHomeScreen(me: me);
       },
     );
   }
